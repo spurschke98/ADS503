@@ -1,0 +1,105 @@
+---
+title: "ADS 503 - Team 7"
+author: "Summer Purschke, Jacqueline Urenda, Oscar Gil"
+date: "06/12/2022"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE,message=FALSE}
+# R Libraries
+library(caret)
+library(AppliedPredictiveModeling)
+library(Hmisc)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(ISLR)
+```
+
+## 1. Load the Red Wine Quality data set from GitHub - data set copied from Kaggle and imported into GitHub.
+```{r, warning=FALSE,message=FALSE, fig.height= 4, fig.width= 6}
+wine <- read.csv(
+  url("https://raw.githubusercontent.com/OscarG-DataSci/ADS503/main/winequality-red.csv")
+                      , header = TRUE)
+
+# No missing data
+summary(wine)
+
+# Quality variable distribution count
+wine %>% count(quality)
+histogram(wine$quality)
+
+# Create new variable, for quality values, split by half (0, 1)
+wine$quality_target <- ifelse( wine$quality <= 5, 0, 1)
+
+# New variable, distribution counts
+wine %>% count(quality_target)
+
+# Mean of new variable is at 0.5347 (close enough to 50% to maintain balance)
+summary(wine$quality_target)
+
+# Check for missing values in data set
+wine %>% na.omit() %>% count() # there are no missing values
+
+
+# Correlation Matrix
+cor <- cor(wine)
+
+# Colors for Correlation Matrix
+colors <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+
+corrplot(cor, order="hclust", method = "color", addCoef.col = "black"
+         , tl.srt = 45, number.cex = 0.47, col=colors(200))
+
+
+# High Correlation features
+highCorr <- findCorrelation(cor, cutoff = .8)
+highCorrFeatures <- wine[, -highCorr]
+```
+```
+```
+## 2. Linear Regression Model
+```{r, warning=FALSE,message=FALSE}
+# High Correlation string for lm.fit
+subset(highCorrFeatures, select = -c(quality_target)) %>% 
+      colnames() %>% 
+      paste0(collapse = " + ")
+
+# Model
+lmodel <- lm(quality~ volatile.acidity + chlorides + total.sulfur.dioxide + 
+               sulphates + alcohol, data = wine)
+
+summary(lmodel)
+
+# Add predicted values to new data frame
+wine %>%
+  mutate(predicted = predict(lmodel, newdata = wine)) -> df
+
+# Summary of predicted interval
+predict(lmodel, newdata = wine, interval = "prediction") %>%
+  summary()
+
+# First few rows of actual data with predictions
+subset(df, select = c(volatile.acidity, chlorides, total.sulfur.dioxide
+                      , sulphates, alcohol, quality_target, quality, predicted)) %>%
+  head(3)
+
+
+# Scatter plot of predicted 
+ggplot(df, aes(x = predicted, y = quality, colour = quality ))+
+geom_point(alpha = 0.3, position = position_jitter()) + stat_smooth()
+
+# The scatter plot supports the summary of the predicted interval, in the ranges of the fit, 
+# lower, and upper ranges. The R-squared value of 0.3495 of the model, indicates that this 
+# information can be predicted 35% of the time, with the data available, for the variance 
+# of the information.
+
+```
