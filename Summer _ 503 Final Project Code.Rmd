@@ -1,0 +1,127 @@
+---
+title: "ADS 503 - Team 7"
+author: "Summer Purschke, Jacqueline Urenda, Oscar Gil"
+date: "06/12/2022"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+NOTES: 
+
+Splitting into training and testing even though I'm using cross validation to get the RMSE, R-Squared, ect values? Should I be splitting at all then or just using the full set 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE,message=FALSE}
+# R Libraries
+library(caret)
+library(AppliedPredictiveModeling)
+library(Hmisc)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(ISLR)
+library(e1071)
+```
+
+## 1. Load the Red Wine Quality data set from GitHub - data set copied from Kaggle and imported into GitHub.
+```{r, warning=FALSE,message=FALSE, fig.height= 4, fig.width= 6}
+wine <- read.csv(
+  url("https://raw.githubusercontent.com/OscarG-DataSci/ADS503/main/winequality-red.csv"))
+  
+```
+
+```{r preprocessing}
+#looking for degenerate columns
+deg_wine<- nearZeroVar(wine)
+  ### vector is empty showing no near zero variance predictors 
+
+```
+
+``    {r}
+# Create new variable, for quality values, split by half (0, 1)
+quality_target <- ifelse(wine$quality <= 5, 0, 1)
+```
+
+```{r splitting}
+
+#splitting data into x and y df's
+quality <- wine$quality
+predictors <- wine[,-12]
+
+
+#splitting data into training and testing 
+training <- createDataPartition(wine$quality, p= 0.8, list=FALSE)
+
+train_predictors <- predictors[training, ]
+test_predictors <- predictors[-training,]
+
+train_quality <- quality[training]
+test_quality <- quality[-training]
+
+```
+```{r
+#### Splitting quality target to try to run a classification model  
+training_quality_target <- createDataPartition(quality_target, p= 0.8, list=FALSE)
+
+train_quality_target_predictors <- wine[training_quality_target,]
+test_quality_target_predictors <- wine[-training_quality_target,]
+
+train_quality_target <- quality_target[training_quality_target]
+test_quality_target <- quality_target[-training_quality_target]
+``
+
+```{r svm tuning}
+
+#page 206 of the textbook for explaining 
+
+
+#training the model using the entire dataset, not split, and cross validation for results
+set.seed(47)
+
+svmTune <- train(predictors, quality,
+                 method = "svmRadial",
+                 preProc = c("center", "scale"),
+                 tuneLength= 5,
+                 trControl = trainControl(method = "cv"))
+
+svmTune
+
+
+#training the model using the training data and predict function for results
+  ### not too sure about this one 
+
+svmTune02 <-  train(train_predictors, train_quality,
+                 method = "svmRadial",
+                 preProc = c("center", "scale"),
+                 tuneLength= 5)
+
+data.frame(obs = test_quality, svm = predict(svmTune02, test_predictors))
+
+
+```
+
+```{r penalized logistic regression tuning}
+
+#tuning parameters, alpha is associated with the ridge(0) versus lasso regression(1)
+glmnGrid <- expand.grid(alpha = c(0,  .1,  .2, .4, .6, .8, 1),
+                        lambda = seq(.01, .2, length = 5))
+
+
+glmnTune <- train(x = train_predictors, 
+                 y = train_quality,
+                 method = "glmnet",
+                 tuneGrid = glmnGrid,
+                 preProc = c("center", "scale"),
+                 trControl = trainControl(method = "cv"))
+glmnTune
+
+```
+
+
+
+
